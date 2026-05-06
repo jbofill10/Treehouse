@@ -133,12 +133,12 @@ func newSessionCommand(session string, title string, path string, size TerminalS
 	if size.Width > 0 && size.Height > 0 {
 		args = append(args, "-x", fmt.Sprintf("%d", size.Width), "-y", fmt.Sprintf("%d", size.Height))
 	}
-	args = append(args, "-n", title, loginShell(), "-lc", shellLaunchCommand(title, "claude"))
+	args = append(args, "-n", title, loginShell(), "-lc", shellLaunchCommand(title, "claude", path))
 	return exec.Command("tmux", args...)
 }
 
 func newWindowCommand(session string, title string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", title+" [nvim]", loginShell(), "-lc", shellLaunchCommand(title, "nvim"))
+	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", title+" [nvim]", loginShell(), "-lc", shellLaunchCommand(title, "nvim", path))
 }
 
 func selectWindowCommand(session string) *exec.Cmd {
@@ -149,11 +149,12 @@ func setTitlesCommand(session string, title string) *exec.Cmd {
 	return exec.Command("tmux", "set-option", "-t", session, "set-titles", "on", ";", "set-option", "-t", session, "set-titles-string", title)
 }
 
-func shellLaunchCommand(title string, program string) string {
+func shellLaunchCommand(title string, program string, path string) string {
 	quotedTitle := strconv.Quote(title)
 	quotedProgram := strconv.Quote(program)
+	quotedPath := strconv.Quote(path)
 
-	return fmt.Sprintf("printf '\\033]2;%%s\\007' %s; exec %s", quotedTitle, quotedProgram)
+	return fmt.Sprintf("printf '\\033]2;%%s\\007' %s; cd %s && exec %s", quotedTitle, quotedPath, quotedProgram)
 }
 
 func SuggestedTargetPath(basePath string, branch string) string {
