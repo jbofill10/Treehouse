@@ -99,11 +99,12 @@ type model struct {
 	modal             modalKind
 	inputs            []textinput.Model
 	activeInput       int
-	pathSuggestions   []pathSuggestion
-	pathSuggestionIdx int
-	worktreeBaseDirty bool
-	createMode        string
-	branchOptions     []string
+	pathSuggestions    []pathSuggestion
+	pathSuggestionIdx  int
+	branchSuggestionIdx int
+	worktreeBaseDirty  bool
+	createMode         string
+	branchOptions      []string
 	helpVisible       bool
 	message           string
 	errMessage        string
@@ -385,28 +386,50 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cycleInputs(msg.String())
 			return m, nil
 		case "up":
+			if m.modal == modalCreateWorktree && m.createMode == "existing" {
+				m.navigateBranchSuggestions(-1)
+				return m, nil
+			}
 			if m.navigatePathSuggestions(-1) {
 				return m, nil
 			}
 			m.cycleInputs(msg.String())
 			return m, nil
 		case "down":
+			if m.modal == modalCreateWorktree && m.createMode == "existing" {
+				m.navigateBranchSuggestions(1)
+				return m, nil
+			}
 			if m.navigatePathSuggestions(1) {
 				return m, nil
 			}
 			m.cycleInputs(msg.String())
 			return m, nil
 		case "right":
+			if m.modal == modalCreateWorktree && m.createMode == "existing" {
+				m.acceptBranchSuggestion()
+				return m, nil
+			}
 			if m.acceptPathSuggestion() {
 				return m, nil
 			}
-		case "ctrl+m":
+		case "ctrl+t":
 			if m.modal == modalCreateWorktree {
 				if m.createMode == "new" {
 					m.createMode = "existing"
+					m.inputs = []textinput.Model{newInput("Branch: ", "")}
+					m.activeInput = 0
+					m.branchSuggestionIdx = 0
 				} else {
 					m.createMode = "new"
+					defaultBase := defaultBaseBranch(m.branchOptions)
+					m.inputs = []textinput.Model{
+						newInput("Branch name: ", ""),
+						newInput("Base branch: ", defaultBase),
+					}
+					m.activeInput = 0
 				}
+				m.applyInputFocus()
 				return m, nil
 			}
 		case "enter":
@@ -414,13 +437,7 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	for i := range m.inputs {
-		if i == m.activeInput {
-			m.inputs[i].Focus()
-		} else {
-			m.inputs[i].Blur()
-		}
-	}
+	m.applyInputFocus()
 	var cmd tea.Cmd
 	if m.modal == modalAddRepo && isTypingKey(msg) {
 		if m.activeInput == 1 {
@@ -430,6 +447,9 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.inputs[m.activeInput], cmd = m.inputs[m.activeInput].Update(msg)
 	if m.modal == modalAddRepo {
 		m.applyAddRepoDefaults()
+	}
+	if m.modal == modalCreateWorktree && m.createMode == "existing" && isTypingKey(msg) {
+		m.branchSuggestionIdx = 0
 	}
 	m.refreshPathSuggestions()
 	return m, cmd
@@ -579,7 +599,7 @@ func (m model) renderHelp() string {
 	}
 	if m.modal == modalCreateWorktree {
 		lines = append(lines,
-			"Create form: tab move fields | ctrl+m toggle new/existing branch mode | enter submit | esc cancel",
+			"Create form: tab move fields | ctrl+t toggle new/existing mode | enter submit | esc cancel",
 		)
 	}
 	return theme.border.Render(strings.Join(lines, "\n"))
@@ -621,35 +641,61 @@ func (m model) renderModal() string {
 			if m.createMode == "existing" {
 				modeText = "existing branch"
 			}
-			lines = append(lines, theme.muted.Render("Mode: "+modeText+" (ctrl+m toggles)"))
+			lines = append(lines, theme.muted.Render("Mode: "+modeText+" (ctrl+t toggles)"))
 		}
-		for i := range m.inputs {
-			label := m.inputs[i].Prompt
-			if i == m.activeInput {
-				label = theme.focused.Render(label)
-			}
-			lines = append(lines, label+m.inputs[i].View())
-			if m.shouldRenderPathSuggestions(i) {
-				lines = append(lines, theme.muted.Render("Directories"))
-				for idx, suggestion := range m.pathSuggestions {
-					entry := theme.muted.Render("  " + shortenPath(suggestion.Value, 120))
-					if idx == m.pathSuggestionIdx {
-						entry = theme.focused.Render("> " + shortenPath(suggestion.Value, 118))
+		if m.modal == modalCreateWorktree && m.createMode == "existing" {
+			label := theme.focused.Render(m.inputs[0].Prompt)
+			lines = append(lines, label+m.inputs[0].View())
+			branches := m.filteredBranchSuggestions()
+			if len(branches) > 0 {
+				const maxVisible = 8
+				start := max(0, m.branchSuggestionIdx-maxVisible+1)
+				if start > m.branchSuggestionIdx {
+					start = m.branchSuggestionIdx
+				}
+				end := min(start+maxVisible, len(branches))
+				if end-start < maxVisible && start > 0 {
+					start = max(0, end-maxVisible)
+				}
+				header := fmt.Sprintf("Branches (%d)", len(branches))
+				lines = append(lines, theme.muted.Render(header))
+				for idx := start; idx < end; idx++ {
+					entry := theme.muted.Render("  " + branches[idx])
+					if idx == m.branchSuggestionIdx {
+						entry = theme.focused.Render("> " + branches[idx])
 					}
 					lines = append(lines, entry)
 				}
+			} else {
+				lines = append(lines, theme.muted.Render("  (no matching branches)"))
 			}
-			if m.modal == modalCreateWorktree && shouldShowSuggestions(m.createMode, i) {
-				suggestions := m.branchSuggestions(i)
-				if len(suggestions) > 0 {
-					lines = append(lines, theme.muted.Render("Suggestions: "+strings.Join(suggestions, "  ")))
+			lines = append(lines, "", theme.muted.Render("up/down select  |  enter confirm  |  ctrl+t switch mode  |  esc cancel"))
+		} else {
+			for i := range m.inputs {
+				label := m.inputs[i].Prompt
+				if i == m.activeInput {
+					label = theme.focused.Render(label)
+				}
+				lines = append(lines, label+m.inputs[i].View())
+				if m.shouldRenderPathSuggestions(i) {
+					lines = append(lines, theme.muted.Render("Directories"))
+					for idx, suggestion := range m.pathSuggestions {
+						entry := theme.muted.Render("  " + shortenPath(suggestion.Value, 120))
+						if idx == m.pathSuggestionIdx {
+							entry = theme.focused.Render("> " + shortenPath(suggestion.Value, 118))
+						}
+						lines = append(lines, entry)
+					}
+				}
+				if m.modal == modalCreateWorktree && shouldShowSuggestions(m.createMode, i) {
+					suggestions := m.branchSuggestions(i)
+					if len(suggestions) > 0 {
+						lines = append(lines, theme.muted.Render("Suggestions: "+strings.Join(suggestions, "  ")))
+					}
 				}
 			}
-			if m.modal == modalCreateWorktree && m.createMode == "existing" && i == 1 {
-				lines = append(lines, theme.muted.Render("Base branch is ignored for existing-branch mode."))
-			}
+			lines = append(lines, "", theme.muted.Render("Enter submits. Tab moves. Esc cancels."))
 		}
-		lines = append(lines, "", theme.muted.Render("Enter submits. Tab moves. Right accepts directory. Esc cancels."))
 		return theme.modalBorder.Render(strings.Join(lines, "\n"))
 	}
 }
@@ -664,6 +710,7 @@ func (m *model) startAddRepo() {
 	m.worktreeBaseDirty = false
 	m.applyAddRepoDefaults()
 	m.refreshPathSuggestions()
+	m.applyInputFocus()
 }
 
 func (m *model) startEditBasePath() {
@@ -677,6 +724,7 @@ func (m *model) startEditBasePath() {
 	}
 	m.activeInput = 0
 	m.refreshPathSuggestions()
+	m.applyInputFocus()
 }
 
 func (m *model) startCreateWorktree() {
@@ -689,16 +737,25 @@ func (m *model) startCreateWorktree() {
 		m.errMessage = err.Error()
 	}
 	defaultBase := defaultBaseBranch(branches)
-	target := launcher.SuggestedTargetPath(m.selectedRepo.WorktreeBasePath, defaultBase)
 	m.modal = modalCreateWorktree
 	m.inputs = []textinput.Model{
 		newInput("Branch name: ", ""),
 		newInput("Base branch: ", defaultBase),
-		newInput("Target path: ", target),
 	}
 	m.activeInput = 0
 	m.createMode = "new"
 	m.branchOptions = branches
+	m.applyInputFocus()
+}
+
+func (m *model) applyInputFocus() {
+	for i := range m.inputs {
+		if i == m.activeInput {
+			m.inputs[i].Focus()
+		} else {
+			m.inputs[i].Blur()
+		}
+	}
 }
 
 func (m *model) cycleInputs(key string) {
@@ -717,6 +774,7 @@ func (m *model) cycleInputs(key string) {
 		m.activeInput = len(m.inputs) - 1
 	}
 	m.refreshPathSuggestions()
+	m.applyInputFocus()
 }
 
 func (m *model) submitModal() tea.Cmd {
@@ -805,13 +863,22 @@ func (m *model) submitCreateWorktree() tea.Cmd {
 		return nil
 	}
 	branch := strings.TrimSpace(m.inputs[0].Value())
-	base := strings.TrimSpace(m.inputs[1].Value())
-	target := strings.TrimSpace(m.inputs[2].Value())
+	if branch == "" && m.createMode == "existing" {
+		// accept highlighted suggestion if input is empty
+		sug := m.filteredBranchSuggestions()
+		if m.branchSuggestionIdx < len(sug) {
+			branch = sug[m.branchSuggestionIdx]
+		}
+	}
 	if branch == "" {
 		m.errMessage = "branch name is required"
 		return nil
 	}
-	if target == "" {
+	var base, target string
+	if m.createMode == "existing" {
+		target = launcher.SuggestedTargetPath(m.selectedRepo.WorktreeBasePath, branch)
+	} else {
+		base = strings.TrimSpace(m.inputs[1].Value())
 		target = launcher.SuggestedTargetPath(m.selectedRepo.WorktreeBasePath, branch)
 	}
 	target, err := filepath.Abs(target)
@@ -945,7 +1012,6 @@ func newInput(prompt string, value string) textinput.Model {
 	in := textinput.New()
 	in.Prompt = prompt
 	in.SetValue(value)
-	in.Focus()
 	in.CharLimit = 512
 	in.Width = 60
 	return in
@@ -1019,6 +1085,44 @@ func (m *model) acceptPathSuggestion() bool {
 	}
 	m.refreshPathSuggestions()
 	return true
+}
+
+func (m *model) filteredBranchSuggestions() []string {
+	if len(m.branchOptions) == 0 {
+		return nil
+	}
+	query := ""
+	if len(m.inputs) > 0 {
+		query = strings.ToLower(strings.TrimSpace(m.inputs[0].Value()))
+	}
+	var matches []string
+	for _, b := range m.branchOptions {
+		if query == "" || strings.Contains(strings.ToLower(b), query) {
+			matches = append(matches, b)
+		}
+	}
+	return matches
+}
+
+func (m *model) navigateBranchSuggestions(delta int) {
+	branches := m.filteredBranchSuggestions()
+	if len(branches) == 0 {
+		return
+	}
+	m.branchSuggestionIdx += delta
+	if m.branchSuggestionIdx < 0 {
+		m.branchSuggestionIdx = len(branches) - 1
+	}
+	if m.branchSuggestionIdx >= len(branches) {
+		m.branchSuggestionIdx = 0
+	}
+}
+
+func (m *model) acceptBranchSuggestion() {
+	branches := m.filteredBranchSuggestions()
+	if m.branchSuggestionIdx < len(branches) {
+		m.inputs[0].SetValue(branches[m.branchSuggestionIdx])
+	}
 }
 
 func (m *model) applyAddRepoDefaults() {
