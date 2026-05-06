@@ -113,19 +113,6 @@ type model struct {
 }
 
 var (
-	titleStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
-	subtitleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-	statusStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	errorStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	borderStyle     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1)
-	mutedStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	focusedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	hintBarStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("230")).Background(lipgloss.Color("238")).Padding(0, 1)
-	sectionStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("221"))
-	emptyStateStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Border(lipgloss.RoundedBorder()).Padding(1)
-)
-
-var (
 	ensureSession = launcher.EnsureSession
 	attachCommand = launcher.AttachCommand
 	hasSession    = launcher.HasSession
@@ -152,7 +139,7 @@ func Run() error {
 }
 
 func newModel(cfg config.Config, launchCwd string) model {
-	delegate := list.NewDefaultDelegate()
+	delegate := newListDelegate()
 
 	repos := list.New([]list.Item{}, delegate, 0, 0)
 	repos.Title = "Saved Repos"
@@ -455,8 +442,8 @@ func (m model) View() string {
 
 	header := lipgloss.JoinVertical(
 		lipgloss.Left,
-		titleStyle.Render("Treehouse"),
-		subtitleStyle.Render(m.headerSubtitle()),
+		theme.title.Render("Treehouse"),
+		theme.subtitle.Render(m.headerSubtitle()),
 	)
 
 	body := m.renderRepos()
@@ -464,10 +451,10 @@ func (m model) View() string {
 		body = m.renderWorktrees()
 	}
 
-	footer := hintBarStyle.Render(m.hintBar())
-	statusLine := statusStyle.Render(m.message)
+	footer := theme.hintBar.Render(m.hintBar())
+	statusLine := theme.status.Render(m.message)
 	if m.errMessage != "" {
-		statusLine = errorStyle.Render(m.errMessage)
+		statusLine = theme.errStyle.Render(m.errMessage)
 	}
 
 	view := lipgloss.JoinVertical(
@@ -534,7 +521,7 @@ func (m *model) syncWorktrees() {
 
 func (m model) renderRepos() string {
 	if len(m.cfg.Repos) == 0 {
-		return emptyStateStyle.Render(strings.Join([]string{
+		return theme.emptyState.Render(strings.Join([]string{
 			"No saved repos yet.",
 			"",
 			"Press a to add a repo.",
@@ -548,18 +535,18 @@ func (m model) renderRepos() string {
 
 func (m model) renderWorktrees() string {
 	if m.selectedRepo == nil {
-		return emptyStateStyle.Render("No repo selected. Press b to return.")
+		return theme.emptyState.Render("No repo selected. Press b to return.")
 	}
 
 	metaLines := []string{
-		sectionStyle.Render("Repo"),
+		theme.section.Render("Repo"),
 		fmt.Sprintf("name: %s", m.selectedRepo.Name),
 		fmt.Sprintf("root: %s", shortenPath(m.selectedRepo.RepoPath, 120)),
 		fmt.Sprintf("default worktree path: %s", shortenPath(m.selectedRepo.WorktreeBasePath, 120)),
 	}
 	if len(m.selectedState.Worktrees) == 0 {
 		metaLines = append(metaLines, "", "No worktrees found for this repo yet.")
-		return borderStyle.Render(strings.Join(metaLines, "\n"))
+		return theme.border.Render(strings.Join(metaLines, "\n"))
 	}
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -571,7 +558,7 @@ func (m model) renderWorktrees() string {
 
 func (m model) renderHelp() string {
 	lines := []string{
-		sectionStyle.Render("Help"),
+		theme.section.Render("Help"),
 		"",
 		"Global: q quit | ? toggle help",
 	}
@@ -595,7 +582,7 @@ func (m model) renderHelp() string {
 			"Create form: tab move fields | ctrl+m toggle new/existing branch mode | enter submit | esc cancel",
 		)
 	}
-	return borderStyle.Render(strings.Join(lines, "\n"))
+	return theme.border.Render(strings.Join(lines, "\n"))
 }
 
 func (m model) renderModal() string {
@@ -606,48 +593,48 @@ func (m model) renderModal() string {
 			return ""
 		}
 		text := fmt.Sprintf("Remove repo?\n\n%s\n%s\n\n[y] remove  [n/esc] cancel", item.repo.Name, item.repo.RepoPath)
-		return borderStyle.Render(text)
+		return theme.modalBorder.Render(text)
 	case modalRemoveWorktree:
 		item, ok := m.selectedWorktreeItem()
 		if !ok {
 			return ""
 		}
 		text := fmt.Sprintf("Remove worktree?\n\n%s\n\n[y] remove  [f] force remove  [n/esc] cancel", item.entry.Path)
-		return borderStyle.Render(text)
+		return theme.modalBorder.Render(text)
 	case modalCloseSession:
 		item, ok := m.selectedWorktreeItem()
 		if !ok {
 			return ""
 		}
 		text := fmt.Sprintf("Close tmux session?\n\n%s\n\nsession: %s\n\n[y] close  [n/esc] cancel", item.entry.Path, item.sessionName)
-		return borderStyle.Render(text)
+		return theme.modalBorder.Render(text)
 	default:
 		lines := []string{}
 		switch m.modal {
 		case modalAddRepo:
-			lines = append(lines, sectionStyle.Render("Add Repo"))
+			lines = append(lines, theme.section.Render("Add Repo"))
 		case modalEditBasePath:
-			lines = append(lines, sectionStyle.Render("Edit Default Worktree Path"))
+			lines = append(lines, theme.section.Render("Edit Default Worktree Path"))
 		case modalCreateWorktree:
-			lines = append(lines, sectionStyle.Render("Create Worktree"))
+			lines = append(lines, theme.section.Render("Create Worktree"))
 			modeText := "new branch from base"
 			if m.createMode == "existing" {
 				modeText = "existing branch"
 			}
-			lines = append(lines, mutedStyle.Render("Mode: "+modeText+" (ctrl+m toggles)"))
+			lines = append(lines, theme.muted.Render("Mode: "+modeText+" (ctrl+m toggles)"))
 		}
 		for i := range m.inputs {
 			label := m.inputs[i].Prompt
 			if i == m.activeInput {
-				label = focusedStyle.Render(label)
+				label = theme.focused.Render(label)
 			}
 			lines = append(lines, label+m.inputs[i].View())
 			if m.shouldRenderPathSuggestions(i) {
-				lines = append(lines, mutedStyle.Render("Directories"))
+				lines = append(lines, theme.muted.Render("Directories"))
 				for idx, suggestion := range m.pathSuggestions {
-					entry := "  " + shortenPath(suggestion.Value, 120)
+					entry := theme.muted.Render("  " + shortenPath(suggestion.Value, 120))
 					if idx == m.pathSuggestionIdx {
-						entry = focusedStyle.Render("> " + shortenPath(suggestion.Value, 118))
+						entry = theme.focused.Render("> " + shortenPath(suggestion.Value, 118))
 					}
 					lines = append(lines, entry)
 				}
@@ -655,15 +642,15 @@ func (m model) renderModal() string {
 			if m.modal == modalCreateWorktree && shouldShowSuggestions(m.createMode, i) {
 				suggestions := m.branchSuggestions(i)
 				if len(suggestions) > 0 {
-					lines = append(lines, mutedStyle.Render("Suggestions: "+strings.Join(suggestions, "  ")))
+					lines = append(lines, theme.muted.Render("Suggestions: "+strings.Join(suggestions, "  ")))
 				}
 			}
 			if m.modal == modalCreateWorktree && m.createMode == "existing" && i == 1 {
-				lines = append(lines, mutedStyle.Render("Base branch is ignored for existing-branch mode."))
+				lines = append(lines, theme.muted.Render("Base branch is ignored for existing-branch mode."))
 			}
 		}
-		lines = append(lines, "", mutedStyle.Render("Enter submits. Tab moves. Right accepts directory. Esc cancels."))
-		return borderStyle.Render(strings.Join(lines, "\n"))
+		lines = append(lines, "", theme.muted.Render("Enter submits. Tab moves. Right accepts directory. Esc cancels."))
+		return theme.modalBorder.Render(strings.Join(lines, "\n"))
 	}
 }
 
