@@ -53,6 +53,7 @@ func TestSuggestedTargetPath(t *testing.T) {
 }
 
 func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
+	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{Width: 120, Height: 40})
 	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "demo:feature/test", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; exec \"claude\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
@@ -61,6 +62,7 @@ func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 }
 
 func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
+	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{})
 	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "demo:feature/test", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; exec \"claude\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
@@ -69,10 +71,34 @@ func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 }
 
 func TestNewWindowCommandUsesDisplayTitle(t *testing.T) {
+	t.Setenv("SHELL", "sh")
 	cmd := newWindowCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature")
 	want := []string{"tmux", "new-window", "-t", "demo-feature:2", "-c", "/tmp/demo-feature", "-n", "demo:feature/test [nvim]", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; exec \"nvim\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
+	}
+}
+
+func TestNewSessionCommandUsesUserShell(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
+	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{})
+	if len(cmd.Args) < 10 || cmd.Args[9] != "/bin/zsh" {
+		t.Fatalf("expected /bin/zsh as shell, args = %#v", cmd.Args)
+	}
+}
+
+func TestNewWindowCommandUsesUserShell(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
+	cmd := newWindowCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature")
+	if len(cmd.Args) < 9 || cmd.Args[8] != "/bin/zsh" {
+		t.Fatalf("expected /bin/zsh as shell, args = %#v", cmd.Args)
+	}
+}
+
+func TestLoginShellFallsBackToSh(t *testing.T) {
+	t.Setenv("SHELL", "")
+	if got := defaultLoginShell(); got != "sh" {
+		t.Fatalf("got %q want %q", got, "sh")
 	}
 }
 

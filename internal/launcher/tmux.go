@@ -21,8 +21,16 @@ var (
 	runCmd = func(cmd *exec.Cmd) error {
 		return cmd.Run()
 	}
-	sleep = time.Sleep
+	sleep     = time.Sleep
+	loginShell = defaultLoginShell
 )
+
+func defaultLoginShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell
+	}
+	return "sh"
+}
 
 const (
 	sessionPollInterval = 25 * time.Millisecond
@@ -125,12 +133,12 @@ func newSessionCommand(session string, title string, path string, size TerminalS
 	if size.Width > 0 && size.Height > 0 {
 		args = append(args, "-x", fmt.Sprintf("%d", size.Width), "-y", fmt.Sprintf("%d", size.Height))
 	}
-	args = append(args, "-n", title, "sh", "-lc", shellLaunchCommand(title, "claude"))
+	args = append(args, "-n", title, loginShell(), "-lc", shellLaunchCommand(title, "claude"))
 	return exec.Command("tmux", args...)
 }
 
 func newWindowCommand(session string, title string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", title+" [nvim]", "sh", "-lc", shellLaunchCommand(title, "nvim"))
+	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", title+" [nvim]", loginShell(), "-lc", shellLaunchCommand(title, "nvim"))
 }
 
 func selectWindowCommand(session string) *exec.Cmd {
