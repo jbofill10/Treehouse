@@ -10,8 +10,24 @@ import (
 	"strings"
 )
 
-const appDir = "claude-manager"
+const appDir = "treehouse"
 const configFile = "config.json"
+
+func migrateLegacyConfigDir() {
+	root, err := configRoot()
+	if err != nil {
+		return
+	}
+	newDir := filepath.Join(root, appDir)
+	oldDir := filepath.Join(root, "claude-manager")
+	if _, err := os.Stat(newDir); err == nil {
+		return
+	}
+	if _, err := os.Stat(oldDir); err != nil {
+		return
+	}
+	_ = os.Rename(oldDir, newDir)
+}
 
 type RepoConfig struct {
 	ID               string `json:"id"`
@@ -24,15 +40,27 @@ type Config struct {
 	Repos []RepoConfig `json:"repos"`
 }
 
-func ConfigPath() (string, error) {
+func configRoot() (string, error) {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return xdg, nil
+	}
 	root, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config dir: %w", err)
+	}
+	return root, nil
+}
+
+func ConfigPath() (string, error) {
+	root, err := configRoot()
+	if err != nil {
+		return "", err
 	}
 	return filepath.Join(root, appDir, configFile), nil
 }
 
 func Load() (Config, error) {
+	migrateLegacyConfigDir()
 	path, err := ConfigPath()
 	if err != nil {
 		return Config{}, err

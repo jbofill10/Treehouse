@@ -28,6 +28,34 @@ func TestNormalizeRepo(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyConfigDir(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", root)
+
+	oldDir := filepath.Join(root, "claude-manager")
+	if err := os.MkdirAll(oldDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(oldDir, "config.json"), []byte(`{"repos":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	newDir := filepath.Join(root, "treehouse")
+	if _, err := os.Stat(newDir); err != nil {
+		t.Fatalf("new config dir not created: %v", err)
+	}
+	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
+		t.Fatalf("old config dir still exists after migration")
+	}
+	if _, err := os.Stat(filepath.Join(newDir, "config.json")); err != nil {
+		t.Fatalf("config.json not present in new dir: %v", err)
+	}
+}
+
 func TestSaveLoad(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
