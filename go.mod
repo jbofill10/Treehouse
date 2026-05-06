@@ -1,4 +1,4 @@
-module claude-manager
+module treehouse
 
 go 1.26.0
 

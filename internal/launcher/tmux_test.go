@@ -55,7 +55,7 @@ func TestSuggestedTargetPath(t *testing.T) {
 func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{Width: 120, Height: 40})
-	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "demo:feature/test", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; cd \"/tmp/demo-feature\" && exec \"claude\""}
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -64,7 +64,7 @@ func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{})
-	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "demo:feature/test", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; cd \"/tmp/demo-feature\" && exec \"claude\""}
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -73,7 +73,7 @@ func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 func TestNewWindowCommandUsesDisplayTitle(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newWindowCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature")
-	want := []string{"tmux", "new-window", "-t", "demo-feature:2", "-c", "/tmp/demo-feature", "-n", "demo:feature/test [nvim]", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; cd \"/tmp/demo-feature\" && exec \"nvim\""}
+	want := []string{"tmux", "new-window", "-t", "demo-feature:2", "-c", "/tmp/demo-feature", "-n", "nvim", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"nvim\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -95,6 +95,15 @@ func TestNewWindowCommandUsesUserShell(t *testing.T) {
 	}
 }
 
+func TestNewShellWindowCommand(t *testing.T) {
+	t.Setenv("SHELL", "sh")
+	cmd := newShellWindowCommand("demo-feature", "/tmp/demo-feature")
+	want := []string{"tmux", "new-window", "-t", "demo-feature:3", "-c", "/tmp/demo-feature", "-n", "shell", "sh", "-l"}
+	if !reflect.DeepEqual(cmd.Args, want) {
+		t.Fatalf("args = %#v want %#v", cmd.Args, want)
+	}
+}
+
 func TestLoginShellFallsBackToSh(t *testing.T) {
 	t.Setenv("SHELL", "")
 	if got := defaultLoginShell(); got != "sh" {
@@ -111,8 +120,9 @@ func TestSetTitlesCommandUsesSessionTitle(t *testing.T) {
 }
 
 func TestShellLaunchCommand(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
 	got := shellLaunchCommand("demo:feature/test", "claude", "/tmp/demo-feature")
-	want := "printf '\\033]2;%s\\007' \"demo:feature/test\"; cd \"/tmp/demo-feature\" && exec \"claude\""
+	want := "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"/bin/zsh\""
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}

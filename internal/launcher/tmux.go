@@ -21,8 +21,11 @@ var (
 	runCmd = func(cmd *exec.Cmd) error {
 		return cmd.Run()
 	}
-	sleep     = time.Sleep
+	sleep      = time.Sleep
 	loginShell = defaultLoginShell
+
+	resolvedClaudePath = "claude"
+	resolvedNvimPath   = "nvim"
 )
 
 func defaultLoginShell() string {
@@ -78,13 +81,18 @@ func EnsureSession(repoName string, branch string, path string, size TerminalSiz
 	if err := runCmd(newSessionCommand(session, title, path, size)); err != nil {
 		return err
 	}
+	// Ensure the claude window lands at index 1 regardless of tmux base-index.
+	// If base-index is already 1 this is a no-op that may fail; that's fine.
+	_ = runCmd(exec.Command("tmux", "move-window", "-s", session+":0", "-t", session+":1"))
 	if err := runCmd(newWindowCommand(session, title, path)); err != nil {
 		return err
 	}
-	if err := runCmd(setTitlesCommand(session, title)); err != nil {
+	if err := runCmd(newShellWindowCommand(session, path)); err != nil {
 		return err
 	}
-	if err := runCmd(selectWindowCommand(session)); err != nil {
+	// set-titles is a global option; ignore failure on configs that disallow it
+	_ = runCmd(setTitlesCommand(session, title))
+	if err := runCmd(exec.Command("tmux", "select-window", "-t", session+":1")); err != nil {
 		return err
 	}
 	return nil
@@ -133,16 +141,16 @@ func newSessionCommand(session string, title string, path string, size TerminalS
 	if size.Width > 0 && size.Height > 0 {
 		args = append(args, "-x", fmt.Sprintf("%d", size.Width), "-y", fmt.Sprintf("%d", size.Height))
 	}
-	args = append(args, "-n", title, loginShell(), "-lc", shellLaunchCommand(title, "claude", path))
+	args = append(args, "-n", "claude", loginShell(), "-lc", shellLaunchCommand(title, resolvedClaudePath, path))
 	return exec.Command("tmux", args...)
 }
 
 func newWindowCommand(session string, title string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", title+" [nvim]", loginShell(), "-lc", shellLaunchCommand(title, "nvim", path))
+	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", "nvim", loginShell(), "-lc", shellLaunchCommand(title, resolvedNvimPath, path))
 }
 
-func selectWindowCommand(session string) *exec.Cmd {
-	return exec.Command("tmux", "select-window", "-t", session+":1")
+func newShellWindowCommand(session string, path string) *exec.Cmd {
+	return exec.Command("tmux", "new-window", "-t", session+":3", "-c", path, "-n", "shell", loginShell(), "-l")
 }
 
 func setTitlesCommand(session string, title string) *exec.Cmd {
@@ -154,7 +162,12 @@ func shellLaunchCommand(title string, program string, path string) string {
 	quotedProgram := strconv.Quote(program)
 	quotedPath := strconv.Quote(path)
 
-	return fmt.Sprintf("printf '\\033]2;%%s\\007' %s; cd %s && exec %s", quotedTitle, quotedPath, quotedProgram)
+	// On failure (bad path, binary not found, etc.) drop into an interactive shell
+	// so the error is visible instead of the window silently closing.
+	return fmt.Sprintf(
+		"printf '\\033]2;%%s\\007' %s; clear; { cd %s && exec %s; } || exec %s",
+		quotedTitle, quotedPath, quotedProgram, strconv.Quote(loginShell()),
+	)
 }
 
 func SuggestedTargetPath(basePath string, branch string) string {
@@ -168,8 +181,15 @@ func SuggestedTargetPath(basePath string, branch string) string {
 
 func ValidateRuntime() error {
 	for _, tool := range []string{"git", "tmux", "nvim", "claude"} {
-		if _, err := exec.LookPath(tool); err != nil {
+		p, err := exec.LookPath(tool)
+		if err != nil {
 			return fmt.Errorf("%s not found in PATH", tool)
+		}
+		switch tool {
+		case "claude":
+			resolvedClaudePath = p
+		case "nvim":
+			resolvedNvimPath = p
 		}
 	}
 	return nil

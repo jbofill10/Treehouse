@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"claude-manager/internal/config"
-	"claude-manager/internal/git"
-	"claude-manager/internal/launcher"
+	"treehouse/internal/config"
+	"treehouse/internal/git"
+	"treehouse/internal/launcher"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -31,6 +31,7 @@ const (
 	modalEditBasePath
 	modalCreateWorktree
 	modalRemoveWorktree
+	modalRemoveRepo
 	modalCloseSession
 )
 
@@ -249,6 +250,23 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "a":
 			m.startAddRepo()
 			return m, nil
+		case "x":
+			if _, ok := m.selectedRepoItem(); !ok {
+				m.message = "No repo selected."
+				return m, nil
+			}
+			m.modal = modalRemoveRepo
+			return m, nil
+		case "up":
+			if m.repos.Index() == 0 {
+				m.repos.Select(len(m.repos.Items()) - 1)
+				return m, nil
+			}
+		case "down":
+			if m.repos.Index() == len(m.repos.Items())-1 {
+				m.repos.Select(0)
+				return m, nil
+			}
 		case "enter":
 			item, ok := m.selectedRepoItem()
 			if !ok {
@@ -301,6 +319,16 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.modal = modalCloseSession
 			return m, nil
+		case "up":
+			if m.worktrees.Index() == 0 {
+				m.worktrees.Select(len(m.worktrees.Items()) - 1)
+				return m, nil
+			}
+		case "down":
+			if m.worktrees.Index() == len(m.worktrees.Items())-1 {
+				m.worktrees.Select(0)
+				return m, nil
+			}
 		}
 	}
 
@@ -315,6 +343,18 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.modal {
+	case modalRemoveRepo:
+		switch msg.String() {
+		case "esc", "n":
+			m.modal = modalNone
+			m.message = "Remove cancelled."
+			return m, nil
+		case "y":
+			cmd := m.removeSelectedRepoCmd()
+			m.modal = modalNone
+			return m, cmd
+		}
+		return m, nil
 	case modalRemoveWorktree:
 		switch msg.String() {
 		case "esc", "n":
@@ -444,7 +484,7 @@ func (m model) View() string {
 		view = lipgloss.JoinVertical(lipgloss.Left, view, "", m.renderHelp())
 	}
 	if m.modal != modalNone {
-		view = lipgloss.JoinVertical(lipgloss.Left, view, "", m.renderModal())
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.renderModal())
 	}
 	return view
 }
@@ -537,7 +577,7 @@ func (m model) renderHelp() string {
 	}
 	if m.screen == screenRepos {
 		lines = append(lines,
-			"Repos: ↑/↓ move | enter open repo | a add repo",
+			"Repos: ↑/↓ move | enter open repo | a add repo | x remove repo",
 			"Add repo: tab move fields | ↑/↓ browse dirs | → accept dir | enter submit | esc cancel",
 			"When empty: press a to create the first saved repo entry.",
 		)
@@ -560,6 +600,13 @@ func (m model) renderHelp() string {
 
 func (m model) renderModal() string {
 	switch m.modal {
+	case modalRemoveRepo:
+		item, ok := m.selectedRepoItem()
+		if !ok {
+			return ""
+		}
+		text := fmt.Sprintf("Remove repo?\n\n%s\n%s\n\n[y] remove  [n/esc] cancel", item.repo.Name, item.repo.RepoPath)
+		return borderStyle.Render(text)
 	case modalRemoveWorktree:
 		item, ok := m.selectedWorktreeItem()
 		if !ok {
@@ -856,6 +903,30 @@ func (m model) removeSelectedWorktreeCmd(force bool) tea.Cmd {
 	}
 }
 
+func (m *model) removeSelectedRepoCmd() tea.Cmd {
+	item, ok := m.selectedRepoItem()
+	if !ok {
+		return func() tea.Msg { return actionMsg{message: "No repo selected."} }
+	}
+	newRepos := make([]config.RepoConfig, 0, len(m.cfg.Repos))
+	for _, r := range m.cfg.Repos {
+		if r.ID != item.repo.ID {
+			newRepos = append(newRepos, r)
+		}
+	}
+	m.cfg.Repos = newRepos
+	if err := config.Save(m.cfg); err != nil {
+		return func() tea.Msg { return actionMsg{err: err} }
+	}
+	if m.selectedRepo != nil && m.selectedRepo.ID == item.repo.ID {
+		m.selectedRepo = nil
+	}
+	m.syncRepos()
+	m.message = "Repo removed."
+	m.errMessage = ""
+	return nil
+}
+
 func (m model) closeSelectedSessionCmd() tea.Cmd {
 	item, ok := m.selectedWorktreeItem()
 	if !ok {
@@ -1002,7 +1073,7 @@ func (m model) selectedWorktreeItem() (worktreeItem, bool) {
 
 func (m model) hintBar() string {
 	if m.screen == screenRepos {
-		return "a add repo  |  enter open repo  |  ? help  |  q quit"
+		return "a add repo  |  x remove repo  |  enter open repo  |  ? help  |  q quit"
 	}
 	return "enter/o open  |  k close session  |  c create  |  x remove  |  p edit path  |  r refresh  |  b back  |  ? help  |  q quit"
 }

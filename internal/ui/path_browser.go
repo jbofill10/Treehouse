@@ -37,10 +37,20 @@ func defaultWorktreeBasePath(repoPath string) string {
 	return filepath.Join(home, "git", "worktrees", filepath.Base(filepath.Clean(repoPath)))
 }
 
+func isGitRepo(path string) bool {
+	_, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil
+}
+
 func listPathSuggestions(raw string, cwd string) ([]pathSuggestion, error) {
 	browseDir, prefix, err := pathBrowseContext(raw, cwd)
 	if err != nil {
 		return nil, err
+	}
+
+	// Don't expand inside a git repo — it's a leaf, not a container.
+	if isGitRepo(browseDir) {
+		return nil, nil
 	}
 
 	entries, err := os.ReadDir(browseDir)

@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"claude-manager/internal/ui"
+	"treehouse/internal/ui"
 )
 
 func main() {

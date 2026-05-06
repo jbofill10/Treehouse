@@ -70,6 +70,40 @@ func TestListPathSuggestionsFiltersFiles(t *testing.T) {
 	}
 }
 
+func TestListPathSuggestionsStopsAtGitRepo(t *testing.T) {
+	cwd := t.TempDir()
+	// sibling is a plain directory — should appear
+	if err := os.Mkdir(filepath.Join(cwd, "plain"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// repo is a git repo — should appear as a suggestion but not expand inside
+	repoDir := filepath.Join(cwd, "repo")
+	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(repoDir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// browsing cwd — both plain and repo should appear
+	got, err := listPathSuggestions(cwd, cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("suggestions at cwd = %#v, want 2 entries", got)
+	}
+
+	// browsing inside the git repo — should return nothing
+	got, err = listPathSuggestions(repoDir, cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("suggestions inside git repo = %#v, want empty", got)
+	}
+}
+
 func TestListPathSuggestionsAreCapped(t *testing.T) {
 	cwd := t.TempDir()
 	for i := range maxPathSuggestions + 3 {

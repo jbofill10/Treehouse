@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"claude-manager/internal/config"
-	"claude-manager/internal/git"
-	"claude-manager/internal/launcher"
+	"treehouse/internal/config"
+	"treehouse/internal/git"
+	"treehouse/internal/launcher"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
