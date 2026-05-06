@@ -1,4 +1,4 @@
-# Claude Manager
+# Treehouse 🏡
 
 Terminal worktree manager for Git repos that launches `claude` and `nvim` in `tmux`.
 
