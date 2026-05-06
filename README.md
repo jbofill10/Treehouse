@@ -19,7 +19,7 @@ Terminal worktree manager for Git repos that launches `claude` and `nvim` in `tm
 ## Run
 
 ```bash
-go run ./cmd/claude-manager
+go run ./cmd/treehouse
 ```
 
 ## Keybindings

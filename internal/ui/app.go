@@ -455,7 +455,7 @@ func (m model) View() string {
 
 	header := lipgloss.JoinVertical(
 		lipgloss.Left,
-		titleStyle.Render("Claude Manager"),
+		titleStyle.Render("Treehouse"),
 		subtitleStyle.Render(m.headerSubtitle()),
 	)
 

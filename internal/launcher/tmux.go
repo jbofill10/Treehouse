@@ -50,7 +50,7 @@ func SessionName(repoName string, branch string) string {
 	name = invalidSessionChars.ReplaceAllString(name, "-")
 	name = strings.Trim(name, "-")
 	if name == "" {
-		return "claude-manager"
+		return "treehouse"
 	}
 	return name
 }
@@ -61,7 +61,7 @@ func DisplayTitle(repoName string, branch string) string {
 
 	switch {
 	case repo == "" && branch == "":
-		return "claude-manager"
+		return "treehouse"
 	case repo == "":
 		return branch
 	case branch == "":
@@ -81,9 +81,6 @@ func EnsureSession(repoName string, branch string, path string, size TerminalSiz
 	if err := runCmd(newSessionCommand(session, title, path, size)); err != nil {
 		return err
 	}
-	// Ensure the claude window lands at index 1 regardless of tmux base-index.
-	// If base-index is already 1 this is a no-op that may fail; that's fine.
-	_ = runCmd(exec.Command("tmux", "move-window", "-s", session+":0", "-t", session+":1"))
 	if err := runCmd(newWindowCommand(session, title, path)); err != nil {
 		return err
 	}
@@ -92,7 +89,7 @@ func EnsureSession(repoName string, branch string, path string, size TerminalSiz
 	}
 	// set-titles is a global option; ignore failure on configs that disallow it
 	_ = runCmd(setTitlesCommand(session, title))
-	if err := runCmd(exec.Command("tmux", "select-window", "-t", session+":1")); err != nil {
+	if err := runCmd(exec.Command("tmux", "select-window", "-t", session+":0")); err != nil {
 		return err
 	}
 	return nil
@@ -146,11 +143,11 @@ func newSessionCommand(session string, title string, path string, size TerminalS
 }
 
 func newWindowCommand(session string, title string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", "nvim", loginShell(), "-lc", shellLaunchCommand(title, resolvedNvimPath, path))
+	return exec.Command("tmux", "new-window", "-t", session+":1", "-c", path, "-n", "nvim", loginShell(), "-lc", shellLaunchCommand(title, resolvedNvimPath, path))
 }
 
 func newShellWindowCommand(session string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":3", "-c", path, "-n", "shell", loginShell(), "-l")
+	return exec.Command("tmux", "new-window", "-t", session+":2", "-c", path, "-n", "shell", loginShell(), "-l")
 }
 
 func setTitlesCommand(session string, title string) *exec.Cmd {

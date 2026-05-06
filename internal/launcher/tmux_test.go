@@ -32,7 +32,7 @@ func TestDisplayTitleFallsBackWhenValuesMissing(t *testing.T) {
 	}{
 		{name: "repo only", repo: "demo", want: "demo"},
 		{name: "branch only", branch: "feature/test", want: "feature/test"},
-		{name: "empty", want: "claude-manager"},
+		{name: "empty", want: "treehouse"},
 	}
 
 	for _, tt := range tests {
@@ -73,7 +73,7 @@ func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 func TestNewWindowCommandUsesDisplayTitle(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newWindowCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature")
-	want := []string{"tmux", "new-window", "-t", "demo-feature:2", "-c", "/tmp/demo-feature", "-n", "nvim", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"nvim\"; } || exec \"sh\""}
+	want := []string{"tmux", "new-window", "-t", "demo-feature:1", "-c", "/tmp/demo-feature", "-n", "nvim", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"nvim\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -98,7 +98,7 @@ func TestNewWindowCommandUsesUserShell(t *testing.T) {
 func TestNewShellWindowCommand(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newShellWindowCommand("demo-feature", "/tmp/demo-feature")
-	want := []string{"tmux", "new-window", "-t", "demo-feature:3", "-c", "/tmp/demo-feature", "-n", "shell", "sh", "-l"}
+	want := []string{"tmux", "new-window", "-t", "demo-feature:2", "-c", "/tmp/demo-feature", "-n", "shell", "sh", "-l"}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
