@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/jbofill10/Treehouse/compare/v0.1.0...v0.2.0) (2026-05-07)
+
+
+### Features
+
+* **docs:** add requirements, install, and usage sections ([d537cc6](https://github.com/jbofill10/Treehouse/commit/d537cc6b1654cf9563d3ae66780819bde2519f32))
+
 ## 1.0.0 (2026-05-07)
 
 
