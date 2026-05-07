@@ -281,7 +281,9 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = "Refreshing worktrees..."
 			return m, refreshRepoCmd(m.selectedRepo.RepoPath)
 		case "o", "enter":
-			return m, m.openSelectedWorktreeCmd()
+			return m, m.openSelectedWorktreeCmd(launcher.ModeNormal)
+		case "D":
+			return m, m.openSelectedWorktreeCmd(launcher.ModeDangerous)
 		case "p":
 			m.startEditBasePath()
 			return m, nil
@@ -590,7 +592,7 @@ func (m model) renderHelp() string {
 		)
 	} else {
 		lines = append(lines,
-			"Worktrees: ↑/↓ move | enter or o open session | k close session | c create | x remove | p edit base path | r refresh | b back",
+			"Worktrees: ↑/↓ move | enter or o open session | D open dangerous | k close session | c create | x remove | p edit base path | r refresh | b back",
 			"Remove confirmation: y remove | f force remove | esc cancel",
 		)
 		if m.modal == modalCloseSession {
@@ -908,7 +910,7 @@ func (m *model) submitCreateWorktree() tea.Cmd {
 	}
 }
 
-func (m model) openSelectedWorktreeCmd() tea.Cmd {
+func (m model) openSelectedWorktreeCmd(mode launcher.LaunchMode) tea.Cmd {
 	if m.selectedRepo == nil {
 		return func() tea.Msg {
 			return actionMsg{message: "Select a repo first."}
@@ -923,7 +925,7 @@ func (m model) openSelectedWorktreeCmd() tea.Cmd {
 	session := launcher.SessionName(m.selectedRepo.Name, item.entry.Branch)
 	size := launcher.TerminalSize{Width: m.width, Height: m.height}
 	return func() tea.Msg {
-		err := ensureSession(m.selectedRepo.Name, item.entry.Branch, item.entry.Path, size)
+		err := ensureSession(m.selectedRepo.Name, item.entry.Branch, item.entry.Path, size, mode)
 		if err != nil {
 			return actionMsg{err: err}
 		}
@@ -1166,7 +1168,7 @@ func (m model) hintBar() string {
 	if m.screen == screenRepos {
 		return "a add repo  |  x remove repo  |  enter open repo  |  ? help  |  q quit"
 	}
-	return "enter/o open  |  k close session  |  c create  |  x remove  |  p edit path  |  r refresh  |  b back  |  ? help  |  q quit"
+	return "enter/o open  |  D dangerous open  |  k close session  |  c create  |  x remove  |  p edit path  |  r refresh  |  b back  |  ? help  |  q quit"
 }
 
 func (m model) branchSuggestions(inputIdx int) []string {

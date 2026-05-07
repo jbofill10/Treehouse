@@ -13,6 +13,27 @@ import (
 
 var invalidSessionChars = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
+type LaunchMode int
+
+const (
+	ModeNormal    LaunchMode = iota
+	ModeDangerous            // passes --dangerously-skip-permissions to claude
+)
+
+func (m LaunchMode) ClaudeArgs() []string {
+	if m == ModeDangerous {
+		return []string{"--dangerously-skip-permissions"}
+	}
+	return nil
+}
+
+func (m LaunchMode) Label() string {
+	if m == ModeDangerous {
+		return "dangerous"
+	}
+	return "normal"
+}
+
 var (
 	HasSession = func(name string) bool {
 		cmd := exec.Command("tmux", "has-session", "-t", name)
@@ -71,14 +92,14 @@ func DisplayTitle(repoName string, branch string) string {
 	}
 }
 
-func EnsureSession(repoName string, branch string, path string, size TerminalSize) error {
+func EnsureSession(repoName string, branch string, path string, size TerminalSize, mode LaunchMode) error {
 	session := SessionName(repoName, branch)
 	title := DisplayTitle(repoName, branch)
 	if HasSession(session) {
 		return nil
 	}
 
-	if err := runCmd(newSessionCommand(session, title, path, size)); err != nil {
+	if err := runCmd(newSessionCommand(session, title, path, size, mode)); err != nil {
 		return err
 	}
 	if err := runCmd(newWindowCommand(session, title, path)); err != nil {
@@ -133,17 +154,17 @@ func insideTmux() bool {
 	return strings.TrimSpace(os.Getenv("TMUX")) != ""
 }
 
-func newSessionCommand(session string, title string, path string, size TerminalSize) *exec.Cmd {
+func newSessionCommand(session string, title string, path string, size TerminalSize, mode LaunchMode) *exec.Cmd {
 	args := []string{"new-session", "-d", "-s", session, "-c", path}
 	if size.Width > 0 && size.Height > 0 {
 		args = append(args, "-x", fmt.Sprintf("%d", size.Width), "-y", fmt.Sprintf("%d", size.Height))
 	}
-	args = append(args, "-n", "claude", loginShell(), "-lc", shellLaunchCommand(title, resolvedClaudePath, path))
+	args = append(args, "-n", "claude", loginShell(), "-lc", shellLaunchCommand(title, resolvedClaudePath, mode.ClaudeArgs(), path))
 	return exec.Command("tmux", args...)
 }
 
 func newWindowCommand(session string, title string, path string) *exec.Cmd {
-	return exec.Command("tmux", "new-window", "-t", session+":1", "-c", path, "-n", "nvim", loginShell(), "-lc", shellLaunchCommand(title, resolvedNvimPath, path))
+	return exec.Command("tmux", "new-window", "-t", session+":1", "-c", path, "-n", "nvim", loginShell(), "-lc", shellLaunchCommand(title, resolvedNvimPath, nil, path))
 }
 
 func newShellWindowCommand(session string, path string) *exec.Cmd {
@@ -154,16 +175,20 @@ func setTitlesCommand(session string, title string) *exec.Cmd {
 	return exec.Command("tmux", "set-option", "-t", session, "set-titles", "on", ";", "set-option", "-t", session, "set-titles-string", title)
 }
 
-func shellLaunchCommand(title string, program string, path string) string {
+func shellLaunchCommand(title string, program string, extraArgs []string, path string) string {
 	quotedTitle := strconv.Quote(title)
-	quotedProgram := strconv.Quote(program)
 	quotedPath := strconv.Quote(path)
+
+	execParts := strconv.Quote(program)
+	for _, a := range extraArgs {
+		execParts += " " + strconv.Quote(a)
+	}
 
 	// On failure (bad path, binary not found, etc.) drop into an interactive shell
 	// so the error is visible instead of the window silently closing.
 	return fmt.Sprintf(
 		"printf '\\033]2;%%s\\007' %s; clear; { cd %s && exec %s; } || exec %s",
-		quotedTitle, quotedPath, quotedProgram, strconv.Quote(loginShell()),
+		quotedTitle, quotedPath, execParts, strconv.Quote(loginShell()),
 	)
 }
 

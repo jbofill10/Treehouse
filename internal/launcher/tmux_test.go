@@ -54,7 +54,7 @@ func TestSuggestedTargetPath(t *testing.T) {
 
 func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 	t.Setenv("SHELL", "sh")
-	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{Width: 120, Height: 40})
+	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{Width: 120, Height: 40}, ModeNormal)
 	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
@@ -63,8 +63,17 @@ func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 
 func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 	t.Setenv("SHELL", "sh")
-	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{})
+	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{}, ModeNormal)
 	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
+	if !reflect.DeepEqual(cmd.Args, want) {
+		t.Fatalf("args = %#v want %#v", cmd.Args, want)
+	}
+}
+
+func TestNewSessionCommandDangerousMode(t *testing.T) {
+	t.Setenv("SHELL", "sh")
+	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{}, ModeDangerous)
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\" \"--dangerously-skip-permissions\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -81,7 +90,7 @@ func TestNewWindowCommandUsesDisplayTitle(t *testing.T) {
 
 func TestNewSessionCommandUsesUserShell(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
-	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{})
+	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{}, ModeNormal)
 	if len(cmd.Args) < 10 || cmd.Args[9] != "/bin/zsh" {
 		t.Fatalf("expected /bin/zsh as shell, args = %#v", cmd.Args)
 	}
@@ -121,8 +130,17 @@ func TestSetTitlesCommandUsesSessionTitle(t *testing.T) {
 
 func TestShellLaunchCommand(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
-	got := shellLaunchCommand("demo:feature/test", "claude", "/tmp/demo-feature")
+	got := shellLaunchCommand("demo:feature/test", "claude", nil, "/tmp/demo-feature")
 	want := "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"/bin/zsh\""
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestShellLaunchCommandWithExtraArgs(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
+	got := shellLaunchCommand("demo:feature/test", "claude", []string{"--dangerously-skip-permissions"}, "/tmp/demo-feature")
+	want := "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\" \"--dangerously-skip-permissions\"; } || exec \"/bin/zsh\""
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}

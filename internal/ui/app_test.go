@@ -256,7 +256,7 @@ func TestOpenSelectedWorktreeCmdEnsuresSessionThenLaunchesTmux(t *testing.T) {
 	})
 
 	origEnsure := ensureSession
-	ensureSession = func(repoName string, branch string, path string, size launcher.TerminalSize) error {
+	ensureSession = func(repoName string, branch string, path string, size launcher.TerminalSize, mode launcher.LaunchMode) error {
 		if repoName != "demo" || branch != "feature/x" || path != "/tmp/demo-feature" {
 			t.Fatalf("unexpected ensure inputs: %q %q %q", repoName, branch, path)
 		}
@@ -269,7 +269,7 @@ func TestOpenSelectedWorktreeCmdEnsuresSessionThenLaunchesTmux(t *testing.T) {
 		ensureSession = origEnsure
 	})
 
-	msg := m.openSelectedWorktreeCmd()()
+	msg := m.openSelectedWorktreeCmd(launcher.ModeNormal)()
 	launch, ok := msg.(launchTmuxMsg)
 	if !ok {
 		t.Fatalf("msg = %T, want launchTmuxMsg", msg)
@@ -315,14 +315,14 @@ func TestOpenSelectedWorktreeCmdReturnsEnsureError(t *testing.T) {
 
 	wantErr := errors.New("tmux failed")
 	origEnsure := ensureSession
-	ensureSession = func(string, string, string, launcher.TerminalSize) error {
+	ensureSession = func(string, string, string, launcher.TerminalSize, launcher.LaunchMode) error {
 		return wantErr
 	}
 	t.Cleanup(func() {
 		ensureSession = origEnsure
 	})
 
-	msg := m.openSelectedWorktreeCmd()()
+	msg := m.openSelectedWorktreeCmd(launcher.ModeNormal)()
 	action, ok := msg.(actionMsg)
 	if !ok {
 		t.Fatalf("msg = %T, want actionMsg", msg)
