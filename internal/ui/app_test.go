@@ -96,11 +96,14 @@ func TestContextualEnterMovesFromRepoListToWorktrees(t *testing.T) {
 	m := newModel(cfg, t.TempDir())
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	updated := next.(model)
-	if updated.screen != screenWorktrees {
-		t.Fatalf("screen = %v, want worktrees", updated.screen)
-	}
 	if updated.selectedRepo == nil || updated.selectedRepo.Name != "demo" {
-		t.Fatalf("selected repo = %#v", updated.selectedRepo)
+		t.Fatalf("selected repo after enter = %#v", updated.selectedRepo)
+	}
+	// screen defers until worktree data arrives
+	next2, _ := updated.Update(repoStateMsg{state: git.RepoState{}, err: nil})
+	updated2 := next2.(model)
+	if updated2.screen != screenWorktrees {
+		t.Fatalf("screen = %v, want worktrees", updated2.screen)
 	}
 }
 
