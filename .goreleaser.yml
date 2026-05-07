@@ -21,10 +21,8 @@ builds:
 
 archives:
   - formats:
-      - tar.gz
+      - binary
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - README.md
 
 changelog:
   disable: true
@@ -32,3 +30,4 @@ changelog:
 release:
   draft: false
   prerelease: auto
+  mode: keep-existing
