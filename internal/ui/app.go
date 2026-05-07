@@ -108,6 +108,7 @@ type model struct {
 	helpVisible       bool
 	message           string
 	errMessage        string
+	loadingWorktrees  bool
 	width             int
 	height            int
 	quitting          bool
@@ -187,11 +188,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case repoStateMsg:
 		if msg.err != nil {
 			m.errMessage = msg.err.Error()
+			m.loadingWorktrees = false
 			return m, nil
 		}
 		m.selectedState = msg.state
 		m.syncWorktrees()
 		m.errMessage = ""
+		m.loadingWorktrees = false
+		m.screen = screenWorktrees
 		return m, nil
 	case actionMsg:
 		if msg.err != nil {
@@ -263,7 +267,7 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			repo := item.repo
 			m.selectedRepo = &repo
-			m.screen = screenWorktrees
+			m.loadingWorktrees = true
 			m.message = "Loading worktrees..."
 			return m, refreshRepoCmd(repo.RepoPath)
 		}
