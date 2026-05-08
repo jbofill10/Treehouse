@@ -298,7 +298,7 @@ func (m model) updateBase(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, refreshRepoCmd(m.selectedRepo.RepoPath)
 		case "o", "enter":
 			return m, m.openSelectedWorktreeCmd(launcher.ModeNormal)
-		case "D":
+		case "d":
 			return m, m.openSelectedWorktreeCmd(launcher.ModeDangerous)
 		case "p":
 			m.startEditBasePath()
@@ -610,7 +610,7 @@ func (m model) renderHelp() string {
 		)
 	} else {
 		lines = append(lines,
-			"Worktrees: ↑/↓ move | enter or o open session | D open dangerous | k close session | c create | x remove | p edit base path | r refresh | b back",
+			"Worktrees: ↑/↓ move | enter or o open session | d open dangerous | k close session | c create | x remove | p edit base path | r refresh | b back",
 			"Remove confirmation: y remove | f force remove | esc cancel",
 		)
 		if m.modal == modalCloseSession {
@@ -1186,7 +1186,7 @@ func (m model) hintBar() string {
 	if m.screen == screenRepos {
 		return iconPlus + " a add repo  |  " + iconTrash + " x remove repo  |  enter open repo  |  " + iconHelp + " ? help  |  q quit"
 	}
-	return "enter/o open  |  D dangerous open  |  " + iconTmux + " k close session  |  " + iconPlus + " c create  |  " + iconTrash + " x remove  |  " + iconEdit + " p edit path  |  " + iconRefresh + " r refresh  |  " + iconBack + " b back  |  " + iconHelp + " ? help  |  q quit"
+	return "enter/o open  |  d dangerous open  |  " + iconTmux + " k close session  |  " + iconPlus + " c create  |  " + iconTrash + " x remove  |  " + iconEdit + " p edit path  |  " + iconRefresh + " r refresh  |  " + iconBack + " b back  |  " + iconHelp + " ? help  |  q quit"
 }
 
 func (m model) branchSuggestions(inputIdx int) []string {
