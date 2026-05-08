@@ -400,8 +400,8 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.worktreeBaseDirty = false
 			m.message = "Action cancelled."
 			return m, nil
-		case "tab", "shift+tab":
-			m.cycleInputs(msg.String())
+		case "shift+tab":
+			m.cycleInputs("shift+tab")
 			return m, nil
 		case "up":
 			if m.modal == modalCreateWorktree && m.createMode == "existing" {
@@ -411,7 +411,7 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.navigatePathSuggestions(-1) {
 				return m, nil
 			}
-			m.cycleInputs(msg.String())
+			m.cycleInputs("shift+tab")
 			return m, nil
 		case "down":
 			if m.modal == modalCreateWorktree && m.createMode == "existing" {
@@ -421,9 +421,9 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.navigatePathSuggestions(1) {
 				return m, nil
 			}
-			m.cycleInputs(msg.String())
+			m.cycleInputs("down")
 			return m, nil
-		case "right":
+		case "tab", "right":
 			if m.modal == modalCreateWorktree && m.createMode == "existing" {
 				m.acceptBranchSuggestion()
 				return m, nil
@@ -795,6 +795,7 @@ func (m *model) cycleInputs(key string) {
 	}
 	m.refreshPathSuggestions()
 	m.applyInputFocus()
+	m.inputs[m.activeInput].CursorEnd()
 }
 
 func (m *model) submitModal() tea.Cmd {
@@ -1097,6 +1098,7 @@ func (m *model) acceptPathSuggestion() bool {
 		return false
 	}
 	m.inputs[m.activeInput].SetValue(m.pathSuggestions[m.pathSuggestionIdx].Value)
+	m.inputs[m.activeInput].CursorEnd()
 	if m.modal == modalAddRepo && m.activeInput == 1 {
 		m.worktreeBaseDirty = true
 	}
@@ -1142,6 +1144,7 @@ func (m *model) acceptBranchSuggestion() {
 	branches := m.filteredBranchSuggestions()
 	if m.branchSuggestionIdx < len(branches) {
 		m.inputs[0].SetValue(branches[m.branchSuggestionIdx])
+		m.inputs[0].CursorEnd()
 	}
 }
 
@@ -1214,7 +1217,7 @@ func shouldShowSuggestions(mode string, inputIdx int) bool {
 }
 
 func defaultBaseBranch(branches []string) string {
-	for _, candidate := range []string{"main", "master"} {
+	for _, candidate := range []string{"origin/main", "origin/master", "main", "master"} {
 		for _, branch := range branches {
 			if branch == candidate {
 				return candidate
@@ -1224,7 +1227,7 @@ func defaultBaseBranch(branches []string) string {
 	if len(branches) > 0 {
 		return branches[0]
 	}
-	return "main"
+	return "origin/main"
 }
 
 func shortenPath(path string, maxLen int) string {

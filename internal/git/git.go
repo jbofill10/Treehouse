@@ -55,14 +55,14 @@ func InspectRepo(repoPath string) (RepoState, error) {
 }
 
 func ListBranches(repoPath string) ([]string, error) {
-	out, err := runGit(repoPath, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	out, err := runGit(repoPath, "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes")
 	if err != nil {
 		return nil, err
 	}
 	var branches []string
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" {
+		if line != "" && !strings.HasSuffix(line, "/HEAD") {
 			branches = append(branches, line)
 		}
 	}
