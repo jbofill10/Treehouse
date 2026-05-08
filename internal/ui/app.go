@@ -40,9 +40,11 @@ type repoItem struct {
 }
 
 func (r repoItem) FilterValue() string { return r.repo.Name + " " + r.repo.RepoPath }
-func (r repoItem) Title() string       { return r.repo.Name }
+func (r repoItem) Title() string {
+	return iconStyleBranch.Render(iconRepo) + " " + r.repo.Name
+}
 func (r repoItem) Description() string {
-	return shortenPath(r.repo.RepoPath, 80) + "  |  wt: " + shortenPath(r.repo.WorktreeBasePath, 48)
+	return shortenPath(r.repo.RepoPath, 60) + "  " + iconStyleMuted.Render(iconBranch) + " " + shortenPath(r.repo.WorktreeBasePath, 48)
 }
 
 type worktreeItem struct {
@@ -53,22 +55,32 @@ type worktreeItem struct {
 
 func (w worktreeItem) FilterValue() string { return w.entry.Branch + " " + w.entry.Path }
 func (w worktreeItem) Title() string {
-	parts := []string{w.entry.Branch}
+	parts := []string{iconStyleBranch.Render(iconBranch) + " " + w.entry.Branch}
 	if w.entry.IsMain {
-		parts = append(parts, "[main]")
+		parts = append(parts, iconStyleMain.Render(iconMain))
 	}
 	if w.entry.IsDetached {
-		parts = append(parts, "[detached]")
+		parts = append(parts, iconStyleDetached.Render(iconDetached))
 	}
 	if w.entry.Dirty {
-		parts = append(parts, fmt.Sprintf("A:%d M:%d D:%d", w.entry.Added, w.entry.Modified, w.entry.Deleted))
+		statusParts := []string{iconStyleModified.Render(iconDirty)}
+		if w.entry.Added > 0 {
+			statusParts = append(statusParts, iconStyleAdded.Render(iconAdded)+fmt.Sprintf("%d", w.entry.Added))
+		}
+		if w.entry.Modified > 0 {
+			statusParts = append(statusParts, iconStyleModified.Render(iconModified)+fmt.Sprintf("%d", w.entry.Modified))
+		}
+		if w.entry.Deleted > 0 {
+			statusParts = append(statusParts, iconStyleDeleted.Render(iconDeleted)+fmt.Sprintf("%d", w.entry.Deleted))
+		}
+		parts = append(parts, strings.Join(statusParts, " "))
 	} else {
-		parts = append(parts, "clean")
+		parts = append(parts, iconStyleClean.Render(iconClean))
 	}
 	if w.sessionActive {
-		parts = append(parts, "tmux:on")
+		parts = append(parts, iconStyleTmuxOn.Render(iconTmux))
 	} else {
-		parts = append(parts, "tmux:off")
+		parts = append(parts, iconStyleTmuxOff.Render(iconTmux))
 	}
 	return strings.Join(parts, "  ")
 }
@@ -478,9 +490,11 @@ func (m model) View() string {
 	}
 
 	footer := theme.hintBar.Render(m.hintBar())
-	statusLine := theme.status.Render(m.message)
+	statusLine := ""
 	if m.errMessage != "" {
-		statusLine = theme.errStyle.Render(m.errMessage)
+		statusLine = iconStyleError.Render(iconError) + " " + theme.errStyle.Render(m.errMessage)
+	} else if m.message != "" {
+		statusLine = iconStyleSuccess.Render(iconSuccess) + " " + theme.status.Render(m.message)
 	}
 
 	view := lipgloss.JoinVertical(
@@ -565,7 +579,7 @@ func (m model) renderWorktrees() string {
 	}
 
 	metaLines := []string{
-		theme.section.Render("Repo"),
+		theme.section.Render(iconRepo + " Repo"),
 		fmt.Sprintf("name: %s", m.selectedRepo.Name),
 		fmt.Sprintf("root: %s", shortenPath(m.selectedRepo.RepoPath, 120)),
 		fmt.Sprintf("default worktree path: %s", shortenPath(m.selectedRepo.WorktreeBasePath, 120)),
@@ -584,7 +598,7 @@ func (m model) renderWorktrees() string {
 
 func (m model) renderHelp() string {
 	lines := []string{
-		theme.section.Render("Help"),
+		theme.section.Render(iconHelp + " Help"),
 		"",
 		"Global: q quit | ? toggle help",
 	}
@@ -638,11 +652,11 @@ func (m model) renderModal() string {
 		lines := []string{}
 		switch m.modal {
 		case modalAddRepo:
-			lines = append(lines, theme.section.Render("Add Repo"))
+			lines = append(lines, theme.section.Render(iconPlus+" Add Repo"))
 		case modalEditBasePath:
-			lines = append(lines, theme.section.Render("Edit Default Worktree Path"))
+			lines = append(lines, theme.section.Render(iconEdit+" Edit Default Worktree Path"))
 		case modalCreateWorktree:
-			lines = append(lines, theme.section.Render("Create Worktree"))
+			lines = append(lines, theme.section.Render(iconBranch+" Create Worktree"))
 			modeText := "new branch from base"
 			if m.createMode == "existing" {
 				modeText = "existing branch"
@@ -1170,9 +1184,9 @@ func (m model) selectedWorktreeItem() (worktreeItem, bool) {
 
 func (m model) hintBar() string {
 	if m.screen == screenRepos {
-		return "a add repo  |  x remove repo  |  enter open repo  |  ? help  |  q quit"
+		return iconPlus + " a add repo  |  " + iconTrash + " x remove repo  |  enter open repo  |  " + iconHelp + " ? help  |  q quit"
 	}
-	return "enter/o open  |  D dangerous open  |  k close session  |  c create  |  x remove  |  p edit path  |  r refresh  |  b back  |  ? help  |  q quit"
+	return "enter/o open  |  D dangerous open  |  " + iconTmux + " k close session  |  " + iconPlus + " c create  |  " + iconTrash + " x remove  |  " + iconEdit + " p edit path  |  " + iconRefresh + " r refresh  |  " + iconBack + " b back  |  " + iconHelp + " ? help  |  q quit"
 }
 
 func (m model) branchSuggestions(inputIdx int) []string {

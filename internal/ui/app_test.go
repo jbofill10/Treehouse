@@ -61,11 +61,17 @@ func TestWorktreeViewShowsCountsAndHelp(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(model)
 	view := m.View()
-	if !strings.Contains(view, "A:2 M:3 D:1") {
-		t.Fatalf("view missing counts: %s", view)
+	if !strings.Contains(view, iconAdded) || !strings.Contains(view, "2") {
+		t.Fatalf("view missing added icon/count: %s", view)
 	}
-	if !strings.Contains(view, "tmux:on") {
-		t.Fatalf("view missing tmux status: %s", view)
+	if !strings.Contains(view, iconModified) || !strings.Contains(view, "3") {
+		t.Fatalf("view missing modified icon/count: %s", view)
+	}
+	if !strings.Contains(view, iconDeleted) || !strings.Contains(view, "1") {
+		t.Fatalf("view missing deleted icon/count: %s", view)
+	}
+	if !strings.Contains(view, iconTmux) {
+		t.Fatalf("view missing tmux icon: %s", view)
 	}
 	if !strings.Contains(view, "enter/o open") {
 		t.Fatalf("view missing worktree hints: %s", view)
