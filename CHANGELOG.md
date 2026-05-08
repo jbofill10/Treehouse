@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/jbofill10/Treehouse/compare/v0.3.0...v0.4.0) (2026-05-08)
+
+
+### Features
+
+* **ui:** rework form input keybindings and use origin/main as worktree base ([2ea112b](https://github.com/jbofill10/Treehouse/commit/2ea112b86a8cf7b318f85dffafa43f850820eb46))
+
 ## [0.3.0](https://github.com/jbofill10/Treehouse/compare/v0.2.0...v0.3.0) (2026-05-08)
 
 
