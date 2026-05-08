@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/jbofill10/Treehouse/compare/v0.2.0...v0.3.0) (2026-05-08)
+
+
+### Features
+
+* **ui:** add Nerd Font icon overhaul ([d580611](https://github.com/jbofill10/Treehouse/commit/d580611b4625144cb3b87d0f37a9e1d59c65c990))
+* **ui:** add Nerd Font icon overhaul ([c19028f](https://github.com/jbofill10/Treehouse/commit/c19028f9ddef40aa6174cb20810b1796938146ca))
+
+
+### Bug Fixes
+
+* **ui:** change dangerous open keybinding to lowercase d ([5b2ef0f](https://github.com/jbofill10/Treehouse/commit/5b2ef0ff865f4f047d2eb0748607ff1cb79a017e))
+
 ## [0.2.0](https://github.com/jbofill10/Treehouse/compare/v0.1.0...v0.2.0) (2026-05-07)
 
 
