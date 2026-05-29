@@ -59,6 +59,13 @@ func defaultLoginShell() string {
 const (
 	sessionPollInterval = 25 * time.Millisecond
 	sessionPollAttempts = 20
+
+	// claudeStartupModelCmd is sent to every new claude window after startup.
+	// Enterprise managed settings can pin the model above the user settings level,
+	// making --model and ANTHROPIC_MODEL ineffective. Issuing /model in-session is
+	// the only way to land on opusplan.
+	claudeStartupModelCmd = "/model opusplan"
+	claudeStartupDelaySec = 2 // seconds to wait for the claude TUI to accept input
 )
 
 type TerminalSize struct {
@@ -134,7 +141,7 @@ func KillSession(name string) error {
 }
 
 func waitForSessionGone(name string) error {
-	for attempt := 0; attempt < sessionPollAttempts; attempt++ {
+	for range sessionPollAttempts {
 		if !HasSession(name) {
 			return nil
 		}
@@ -154,12 +161,21 @@ func insideTmux() bool {
 	return strings.TrimSpace(os.Getenv("TMUX")) != ""
 }
 
+// startupKeysScript returns a backgrounded subshell that waits for the claude
+// TUI to initialize, then types the model-selection command. The subshell is
+// forked before exec replaces the login shell, so it survives the process swap.
+func startupKeysScript(session string) string {
+	return fmt.Sprintf("( sleep %d; tmux send-keys -t %s %s Enter ) & ",
+		claudeStartupDelaySec, strconv.Quote(session+":0"), strconv.Quote(claudeStartupModelCmd))
+}
+
 func newSessionCommand(session string, title string, path string, size TerminalSize, mode LaunchMode) *exec.Cmd {
 	args := []string{"new-session", "-d", "-s", session, "-c", path}
 	if size.Width > 0 && size.Height > 0 {
 		args = append(args, "-x", fmt.Sprintf("%d", size.Width), "-y", fmt.Sprintf("%d", size.Height))
 	}
-	args = append(args, "-n", "claude", loginShell(), "-lc", shellLaunchCommand(title, resolvedClaudePath, mode.ClaudeArgs(), path))
+	launch := startupKeysScript(session) + shellLaunchCommand(title, resolvedClaudePath, mode.ClaudeArgs(), path)
+	args = append(args, "-n", "claude", loginShell(), "-lc", launch)
 	return exec.Command("tmux", args...)
 }
 
@@ -179,10 +195,13 @@ func shellLaunchCommand(title string, program string, extraArgs []string, path s
 	quotedTitle := strconv.Quote(title)
 	quotedPath := strconv.Quote(path)
 
-	execParts := strconv.Quote(program)
+	var execBuilder strings.Builder
+	execBuilder.WriteString(strconv.Quote(program))
 	for _, a := range extraArgs {
-		execParts += " " + strconv.Quote(a)
+		execBuilder.WriteString(" ")
+		execBuilder.WriteString(strconv.Quote(a))
 	}
+	execParts := execBuilder.String()
 
 	// On failure (bad path, binary not found, etc.) drop into an interactive shell
 	// so the error is visible instead of the window silently closing.

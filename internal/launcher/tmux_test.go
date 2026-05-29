@@ -52,10 +52,19 @@ func TestSuggestedTargetPath(t *testing.T) {
 	}
 }
 
+const wantStartupPrefix = "( sleep 2; tmux send-keys -t \"demo-feature:0\" \"/model opusplan\" Enter ) & "
+
+func TestStartupKeysScript(t *testing.T) {
+	got := startupKeysScript("demo-feature")
+	if got != wantStartupPrefix {
+		t.Fatalf("got %q want %q", got, wantStartupPrefix)
+	}
+}
+
 func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{Width: 120, Height: 40}, ModeNormal)
-	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-x", "120", "-y", "40", "-n", "claude", "sh", "-lc", wantStartupPrefix + "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -64,7 +73,7 @@ func TestNewSessionCommandIncludesSizeWhenProvided(t *testing.T) {
 func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{}, ModeNormal)
-	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", wantStartupPrefix + "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
@@ -73,7 +82,7 @@ func TestNewSessionCommandOmitsSizeWhenUnavailable(t *testing.T) {
 func TestNewSessionCommandDangerousMode(t *testing.T) {
 	t.Setenv("SHELL", "sh")
 	cmd := newSessionCommand("demo-feature", "demo:feature/test", "/tmp/demo-feature", TerminalSize{}, ModeDangerous)
-	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\" \"--dangerously-skip-permissions\"; } || exec \"sh\""}
+	want := []string{"tmux", "new-session", "-d", "-s", "demo-feature", "-c", "/tmp/demo-feature", "-n", "claude", "sh", "-lc", wantStartupPrefix + "printf '\\033]2;%s\\007' \"demo:feature/test\"; clear; { cd \"/tmp/demo-feature\" && exec \"claude\" \"--dangerously-skip-permissions\"; } || exec \"sh\""}
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("args = %#v want %#v", cmd.Args, want)
 	}
