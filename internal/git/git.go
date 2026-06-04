@@ -7,7 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"syscall"
 )
 
 type WorktreeEntry struct {
@@ -101,7 +104,56 @@ func RemoveWorktree(repoPath string, worktreePath string, force bool) error {
 	}
 	args = append(args, worktreePath)
 	_, err := runGit(repoPath, args...)
-	return err
+	if err == nil {
+		return nil
+	}
+	reason, locked := parseLockReason(err.Error())
+	if !locked {
+		return err
+	}
+	pid, hasPID := extractLockPID(reason)
+	if !hasPID {
+		return fmt.Errorf("worktree is locked: %s — use 'git worktree unlock %s' to unlock first", reason, worktreePath)
+	}
+	if isPIDAlive(pid) {
+		return fmt.Errorf("worktree is locked by an active process (pid %d): %s", pid, reason)
+	}
+	if _, unlockErr := runGit(repoPath, "worktree", "unlock", worktreePath); unlockErr != nil {
+		return fmt.Errorf("worktree has a stale lock (pid %d dead) but unlock failed: %w", pid, unlockErr)
+	}
+	_, retryErr := runGit(repoPath, args...)
+	return retryErr
+}
+
+func parseLockReason(errMsg string) (string, bool) {
+	_, after, ok := strings.Cut(errMsg, "lock reason: ")
+	if !ok {
+		return "", false
+	}
+	reason, _, _ := strings.Cut(after, "\n")
+	return strings.TrimSpace(reason), true
+}
+
+var lockPIDRe = regexp.MustCompile(`\(pid (\d+)\)`)
+
+func extractLockPID(reason string) (int, bool) {
+	m := lockPIDRe.FindStringSubmatch(reason)
+	if m == nil {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return pid, true
+}
+
+func isPIDAlive(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
 }
 
 func currentBranch(repoPath string) (string, error) {
