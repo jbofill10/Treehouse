@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/jbofill10/Treehouse/compare/v0.4.0...v0.5.0) (2026-06-04)
+
+
+### Features
+
+* **launcher:** auto-switch model to opusplan on session start ([c004a1c](https://github.com/jbofill10/Treehouse/commit/c004a1c857456bb0e2cbcac5d8a3a40989f06f43))
+
+
+### Bug Fixes
+
+* **git:** handle stale worktree locks on removal ([cd80f4a](https://github.com/jbofill10/Treehouse/commit/cd80f4adeff176632929866e5ab2cd9f13d00541))
+
 ## [0.4.0](https://github.com/jbofill10/Treehouse/compare/v0.3.0...v0.4.0) (2026-05-08)
 
 
